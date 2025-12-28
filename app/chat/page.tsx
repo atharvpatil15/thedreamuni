@@ -97,7 +97,7 @@ export default function ChatPage() {
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
-    const nextMessages = [...messages, { role: "user", content: text.trim() }];
+    const nextMessages: ChatMessage[] = [...messages, { role: "user", content: text.trim() }];
     setMessages(nextMessages);
     setInput("");
     setIsLoading(true);
@@ -110,12 +110,12 @@ export default function ChatPage() {
       });
       const data = await response.json();
       const reply = data?.content ?? "Sorry, I could not reply right now.";
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      setMessages((prev) => [...prev, { role: "assistant" as const, content: reply }]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
         {
-          role: "assistant",
+          role: "assistant" as const,
           content: "Network issue. Please try again in a moment.",
         },
       ]);
