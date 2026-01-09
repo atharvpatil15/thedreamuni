@@ -9,6 +9,11 @@
     to { transform: translateX(-50%); }
   }
 
+  @keyframes marquee-vertical {
+    from { transform: translateY(0); }
+    to { transform: translateY(-50%); }
+  }
+
   @keyframes fade-in-up {
     from {
       opacity: 0;
@@ -33,6 +38,7 @@
   }
 
   --animate-marquee: marquee 30s linear infinite;
+  --animate-marquee-vertical: marquee-vertical 10s linear infinite;
   --animate-fade-in-up: fade-in-up 0.8s ease-out forwards;
   --animate-levitate: levitate 6s ease-in-out infinite;
   --animate-levitate-delayed: levitate-delayed 8s ease-in-out infinite;
@@ -45,6 +51,7 @@
 
 html {
   scroll-padding-top: 120px;
+  scroll-behavior: smooth;
 }
 
 body {

@@ -1,132 +1,145 @@
-import { universitiesData } from "@/lib/data";
 
-const SYSTEM_PROMPT = `You are a University Data API. 
-Your goal is to return a JSON array of universities that match the user's search criteria.
-Return ONLY valid JSON. No markdown, no explanations.
-
-Output Schema:
-[
-  {
-    "id": "string (unique-kebab-case)",
-    "name": "string",
-    "location": "City, Country",
-    "country": "string",
-    "tuition": number (approx yearly USD),
-    "ranking": number (approx global rank),
-    "courses": ["string", "string", "string"],
-    "focus": "string (short 4-5 word summary)",
-    "website": "string (official URL starting with https://)"
-  }
-]
-
-IMPORTANT:
-1. Provide the official website URL for every university.
-2. If possible, return at least 15-20 relevant universities.
-3. If specific filters are given (e.g., "Computer Science in Germany"), try to find as many real matches as possible.
-4. Be accurate with tuition and location data.`;
+import { supabase } from "@/lib/supabaseClient";
+import { generateEmbedding } from "@/lib/ai";
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const { degree, course, country, budget, rank, ielts } = await req.json();
   
-  // Parse Body
-  const { query, country, budget } = await req.json();
+  console.log(`🔍 Search Request: Course='${course}', Country='${country}'`);
 
-  // If no API Key, filter the static local data (Fallback Mode)
-  if (!apiKey) {
-    console.log("No API Key found, using static fallback.");
-    let results = universitiesData;
-
-    // 1. Country Filter
-    if (country && country !== "All") {
-      results = results.filter(u => u.country.toLowerCase() === country.toLowerCase() || (country === "Europe" && ["Germany", "UK", "Netherlands", "Switzerland"].includes(u.country)));
-    }
-    
-    // 2. Budget Filter
-    if (budget) {
-      results = results.filter(u => u.tuition <= budget);
-    }
-    
-    // 3. Keyword/Query Filter
-    if (query) {
-      const q = query.toLowerCase();
-      results = results.filter(u => 
-        u.name.toLowerCase().includes(q) || 
-        u.courses.some(c => c.toLowerCase().includes(q)) ||
-        u.country.toLowerCase().includes(q) ||
-        u.location.toLowerCase().includes(q)
-      );
-    }
-    
-    // 4. Default Sorting (Ranking)
-    results.sort((a,b) => a.ranking - b.ranking);
-
-    // 5. Slice ONLY if it's a broad "Top 20" request (no specific country/query)
-    // If user asked for "Germany", show ALL German unis we have (don't limit to 20 if we have 50)
-    if (!query && country === "All") {
-        results = results.slice(0, 20);
-    }
-
-    return Response.json({ universities: results });
-  }
-
-  // Construct the User Prompt for the AI
-  let userPrompt = "Find universities.";
-  if (query || (country && country !== "All") || (budget && budget < 70000)) {
-     userPrompt += ` Return at least 20 results if possible. Filters: `;
-     if (query) userPrompt += `Keywords: "${query}". `;
-     if (country && country !== "All") userPrompt += `Country: ${country}. `;
-     if (budget) userPrompt += `Max Tuition: $${budget}. `;
-  } else {
-    userPrompt = "List the Top 20 universities in the world.";
-  }
+  let searchMode = "INITIALIZING";
 
   try {
-    const payload = {
-      model: "google/gemini-2.0-flash-exp:free", // Free, fast model
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.2, // Low temperature for factual JSON
-      response_format: { type: "json_object" } 
-    };
+    let candidateIds: string[] | null = null;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://thedreamuni.local",
-        "X-Title": "TheDreamUni",
-      },
-      body: JSON.stringify(payload)
+    // DECISION MATRIX:
+    // 1. If Country is "All", use AI to find the best global matches.
+    // 2. If Country is SPECIFIC, DO NOT USE AI. Use SQL Text Search.
+    //    Reason: AI might miss specific regional universities in the top 200, 
+    //    causing the intersection (Country + AI) to be empty.
+    //    SQL 'ilike' is 100% reliable if we know the country.
+
+    if (course !== "All" && country === "All") {
+      searchMode = "AI_GLOBAL_SEARCH";
+      const aiQuery = `University program for ${course} ${degree !== "All" ? degree : ""} degree.`;
+      const vector = await generateEmbedding(aiQuery);
+
+      const { data: matchedIds, error: searchError } = await supabase.rpc('match_universities', {
+        query_embedding: vector,
+        match_threshold: 0.15, 
+        match_count: 100
+      });
+
+      if (!searchError && matchedIds && matchedIds.length > 0) {
+        candidateIds = matchedIds.map((m: any) => m.id);
+      } else {
+        searchMode = "AI_FAILED_FALLBACK";
+      }
+    } else {
+      searchMode = "DIRECT_SQL_FILTER";
+    }
+
+    console.log(`📡 SEARCH MODE: ${searchMode}`);
+
+    // STEP 2: Database Query Construction
+    let queryBuilder = supabase
+      .from('universities')
+      .select(`
+        *,
+        programs!inner (
+          name,
+          tuition_fee,
+          degree_level
+        )
+      `);
+
+    // A. Country Filter
+    if (country !== "All") {
+      if (country === "Europe") {
+        queryBuilder = queryBuilder.in('country', ["Germany", "UK", "Netherlands", "Switzerland", "France", "Italy", "Austria", "Spain", "Poland"]);
+      } else {
+        queryBuilder = queryBuilder.ilike('country', country.trim());
+      }
+    }
+
+    // B. Course Filter
+    if (course !== "All") {
+      if (candidateIds && candidateIds.length > 0) {
+        // AI Mode
+        queryBuilder = queryBuilder.in('id', candidateIds);
+      } else {
+        // SQL Mode (Text Search)
+        // "Computer Science" -> matches "Computer" OR "Science" OR "Data"
+        const keywords = course.split(" ");
+        const firstWord = keywords[0]; 
+        // We use the first word for broad matching to avoid missing "Informatics" if user searches "Computer Science"
+        // In a real app, we'd use Full Text Search (FTS)
+        queryBuilder = queryBuilder.ilike('programs.name', `%${firstWord}%`);
+      }
+    }
+
+    // C. Limit
+    queryBuilder = queryBuilder.limit(50);
+
+    console.log(`🔎 Executing DB Query for: Country=${country.trim()}, Course=${course.split(" ")[0]}`);
+
+    const { data, error } = await queryBuilder;
+    
+    if (error) {
+        console.error("❌ DB Query Error:", error.message);
+        throw error;
+    }
+
+    let universitiesRaw = data || [];
+    console.log(`✅ DB returned ${universitiesRaw.length} universities.`);
+
+    if (universitiesRaw.length > 0) {
+        const sample = universitiesRaw[0];
+        console.log(`   Sample: ${sample.name}, Country=${sample.country}`);
+        console.log(`   Programs: ${sample.programs?.length} found.`);
+    }
+
+    // STEP 3: Post-Processing
+    let processedResults = universitiesRaw.map((u: any) => {
+      const fees = u.programs?.map((p: any) => p.tuition_fee).filter((f: number) => f >= 0) || [];
+      const minTuition = fees.length > 0 ? Math.min(...fees) : 0;
+      
+      // LOG TUITION DEBUG
+      if (u.country === "Germany" && minTuition > 5000) {
+          console.log(`   ⚠️ High Tuition for ${u.name}: ${minTuition} (Budget: ${budget})`);
+      }
+
+      return {
+        // ... mapped fields
+        id: u.id,
+        name: u.name,
+        location: `${u.city}, ${u.country}`,
+        country: u.country,
+        ranking: u.ranking_global || 999,
+        tuition: minTuition,
+        courses: u.programs?.slice(0, 3).map((p: any) => p.name) || [],
+        focus: u.programs?.[0]?.name || u.description || "General University",
+        website: u.website_url || "#",
+        _debug_source: searchMode
+      };
     });
 
-    if (!response.ok) {
-        throw new Error(`OpenRouter Error: ${response.statusText}`);
-    }
+    const preFilterCount = processedResults.length;
 
-    const data = await response.json();
-    const rawContent = data.choices[0].message.content;
-    
-    // Attempt to parse the JSON
-    let universities = [];
-    try {
-        universities = JSON.parse(rawContent);
-        // Handle case where AI wraps it in { "universities": [...] }
-        if (!Array.isArray(universities) && universities.universities) {
-            universities = universities.universities;
-        }
-    } catch (e) {
-        console.error("JSON Parse Error", e);
-        return Response.json({ error: "Failed to parse AI response" }, { status: 500 });
-    }
+    if (budget < 100000) processedResults = processedResults.filter((u) => u.tuition <= budget);
+    const postBudgetCount = processedResults.length;
+    console.log(`   📉 Budget Filter: ${preFilterCount} -> ${postBudgetCount} (Lost ${preFilterCount - postBudgetCount})`);
 
-    return Response.json({ universities });
+    if (rank < 1000) processedResults = processedResults.filter((u) => u.ranking <= rank);
+    console.log(`   📉 Rank Filter: ${postBudgetCount} -> ${processedResults.length}`);
+
+    return Response.json({ 
+        universities: processedResults,
+        meta: { mode: searchMode, count: processedResults.length }
+    });
 
   } catch (error) {
-    console.error("AI Search Error:", error);
-    // Fallback to static data on error
-    return Response.json({ universities: universitiesData.sort((a,b) => a.ranking - b.ranking).slice(0, 20) });
+    console.error("Search API Error:", error);
+    return Response.json({ universities: [] });
   }
 }

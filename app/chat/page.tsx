@@ -2,16 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, Send, Bot, User, ArrowRight } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
-
-type ChatBlock =
-  | { type: "paragraph"; content: string }
-  | { type: "unordered-list"; items: string[] }
-  | { type: "ordered-list"; items: string[] };
 
 const starterChips = [
   "Compare CS programs in Canada vs Germany",
@@ -20,66 +17,12 @@ const starterChips = [
   "Estimate cost of living in Melbourne",
 ];
 
-const parseChatBlocks = (content: string): ChatBlock[] => {
-  const lines = content.split("\n");
-  const blocks: ChatBlock[] = [];
-  let paragraphBuffer: string[] = [];
-  let listBuffer: { type: "unordered-list" | "ordered-list"; items: string[] } | null =
-    null;
-
-  const flushParagraph = () => {
-    if (paragraphBuffer.length) {
-      blocks.push({ type: "paragraph", content: paragraphBuffer.join(" ") });
-      paragraphBuffer = [];
-    }
-  };
-
-  const flushList = () => {
-    if (listBuffer) {
-      blocks.push(listBuffer);
-      listBuffer = null;
-    }
-  };
-
-  lines.forEach((rawLine) => {
-    const line = rawLine.trim();
-    if (!line) {
-      flushParagraph();
-      flushList();
-      return;
-    }
-
-    const unorderedMatch = line.match(/^[-*•]\s+(.*)$/);
-    const orderedMatch = line.match(/^\d+\.\s+(.*)$/);
-
-    if (unorderedMatch || orderedMatch) {
-      flushParagraph();
-      const type = unorderedMatch ? "unordered-list" : "ordered-list";
-      const item = (unorderedMatch ?? orderedMatch)?.[1]?.trim() ?? "";
-      if (!listBuffer || listBuffer.type !== type) {
-        flushList();
-        listBuffer = { type, items: [] };
-      }
-      listBuffer.items.push(item);
-      return;
-    }
-
-    flushList();
-    paragraphBuffer.push(line);
-  });
-
-  flushParagraph();
-  flushList();
-
-  return blocks;
-};
-
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
       content:
-        "Hi! I'm your DreamUni Advisor. I can help you compare universities, estimate costs, and build your application timeline. What's on your mind?",
+        "Hi! I'm your DreamUni Advisor. I have access to a database of **480+ top global universities**. \n\nAsk me about programs, tuition, or specific admission requirements!",
     },
   ]);
   const [input, setInput] = useState("");
@@ -142,13 +85,13 @@ export default function ChatPage() {
         <div className="text-center mb-10 ">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 backdrop-blur-md mb-4 animate-fade-in-up">
             <Sparkles className="w-3 h-3 text-fuchsia-400" />
-            <span className="text-xs font-bold tracking-widest uppercase text-white/70">AI Powered</span>
+            <span className="text-xs font-bold tracking-widest uppercase text-white/70">AI Powered RAG Engine</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 font-display">
             Intelligent <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-cyan-400">Academic Advisor</span>
           </h1>
           <p className="text-white/50 text-sm max-w-2xl mx-auto">
-            Real-time guidance on university selection, visa requirements, and tuition planning.
+            Powered by Semantic Search. Ask complex questions about 480+ universities.
           </p>
         </div>
 
@@ -168,8 +111,8 @@ export default function ChatPage() {
                   <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full animate-pulse" />
                 </div>
                 <div>
-                  <p className="font-bold text-sm text-white">Academic Assistant</p>
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider font-bold">Online Now</p>
+                  <p className="font-bold text-sm text-white">TheDreamUni AI</p>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider font-bold">Connected to Database</p>
                 </div>
               </div>
             </div>
@@ -196,25 +139,15 @@ export default function ChatPage() {
                       : "bg-white/5 border border-white/10 text-white/90 rounded-tl-sm backdrop-blur-md"
                       }`}
                   >
-                    <div className="space-y-3">
-                      {parseChatBlocks(message.content).map((block, blockIndex) => {
-                        if (block.type === "unordered-list") {
-                          return (
-                            <ul key={blockIndex} className="list-disc list-inside space-y-1 opacity-90">
-                              {block.items.map((item, i) => <li key={i}>{item}</li>)}
-                            </ul>
-                          );
-                        }
-                        if (block.type === "ordered-list") {
-                          return (
-                            <ol key={blockIndex} className="list-decimal list-inside space-y-1 opacity-90">
-                              {block.items.map((item, i) => <li key={i}>{item}</li>)}
-                            </ol>
-                          );
-                        }
-                        return <p key={blockIndex}>{block.content}</p>;
-                      })}
-                    </div>
+                    {message.role === "user" ? (
+                      <p>{message.content}</p>
+                    ) : (
+                      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-black/50 prose-pre:p-2 prose-pre:rounded-lg">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
+                    )}
                   </div>
 
                   {message.role === "user" && (
@@ -230,10 +163,13 @@ export default function ChatPage() {
                   <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 mt-1">
                     <Bot className="w-4 h-4 text-white/60" />
                   </div>
-                  <div className="px-5 py-4 rounded-2xl rounded-tl-sm bg-white/5 border border-white/10 flex items-center gap-2">
-                    <span className="w-2 h-2 bg-white/40 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                    <span className="w-2 h-2 bg-white/40 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                    <span className="w-2 h-2 bg-white/40 rounded-full animate-bounce"></span>
+                  <div className="px-5 py-4 rounded-2xl rounded-tl-sm bg-white/5 border border-white/10 flex items-center gap-3">
+                    <span className="text-xs font-mono text-cyan-400 animate-pulse">SEARCHING DATABASE...</span>
+                    <div className="flex gap-1">
+                        <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                        <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                        <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce"></span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -245,7 +181,7 @@ export default function ChatPage() {
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type a message..."
+                  placeholder="Ask about universities, e.g., 'Cheap engineering in Germany'..."
                   className="w-full bg-white/5 border border-white/10 rounded-full py-4 pl-6 pr-14 text-sm text-white focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/10 transition-all placeholder:text-white/30"
                 />
                 <button

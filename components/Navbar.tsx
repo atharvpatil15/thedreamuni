@@ -17,8 +17,10 @@ const Navbar = () => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
         window.addEventListener("scroll", handleScroll);
         
-        // Force scroll to top on route change
-        window.scrollTo(0, 0);
+        // Force scroll to top on route change only if NOT a hash link
+        if (!window.location.hash) {
+             window.scrollTo(0, 0);
+        }
 
         return () => window.removeEventListener("scroll", handleScroll);
     }, [pathname]);
@@ -55,8 +57,9 @@ const Navbar = () => {
                     <NavLink href="/" active={pathname === "/"}>Home</NavLink>
                     <NavLink href="/universities" active={pathname === "/universities"}>Universities</NavLink>
                     <NavLink href="/chat" active={pathname === "/chat"}>AI Chat</NavLink>
-                    <NavLink href="/services" active={pathname === "/services"}>Services</NavLink>
-                    <NavLink href="/contact" active={pathname === "/contact"}>Contact</NavLink>
+                    {/* Changed to Hash Links for Smooth Scroll */}
+                    <NavLink href="/#services" active={false}>Services</NavLink>
+                    <NavLink href="/#contact" active={false}>Contact</NavLink>
                 </div>
 
                 {/* CTA Button */}
@@ -93,9 +96,9 @@ const Navbar = () => {
                             { name: "Home", href: "/" },
                             { name: "Universities", href: "/universities" },
                             { name: "AI Chat", href: "/chat" },
-                            { name: "Services", href: "/services" },
-                            { name: "Contact", href: "/contact" },
-                            { name: "Log In", href: "/login" }, // Added Mobile Link
+                            { name: "Services", href: "/#services" }, // Updated
+                            { name: "Contact", href: "/contact" },   // Updated
+                            { name: "Log In", href: "/login" },
                         ].map((link) => (
                             <Link
                                 key={link.href}
