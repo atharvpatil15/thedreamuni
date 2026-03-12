@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Poppins, Antonio } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import { ClerkProvider } from "@clerk/nextjs";
+import ClerkAuthWall from "@/components/ClerkAuthWall";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -26,13 +28,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark scroll-smooth">
-      <body
-        className={`${poppins.variable} ${antonio.variable} antialiased min-h-screen bg-[#030014] font-sans`}
-      >
-        <Navbar />
-        {children}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" className="dark scroll-smooth">
+        <body
+          className={`${poppins.variable} ${antonio.variable} antialiased min-h-screen bg-[#030014] font-sans`}
+        >
+          <ClerkAuthWall>
+            <Navbar />
+            {children}
+          </ClerkAuthWall>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

@@ -4,8 +4,10 @@ import Link from "next/link";
 import { Menu, X, ArrowRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { useAuth, SignInButton, UserButton } from "@clerk/nextjs";
 
 const Navbar = () => {
+    const { isLoaded, isSignedIn } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const pathname = usePathname();
@@ -64,12 +66,16 @@ const Navbar = () => {
 
                 {/* CTA Button */}
                 <div className="hidden md:flex items-center gap-4">
-                    <Link 
-                        href="/login"
-                        className="text-sm font-bold font-display uppercase tracking-wide text-white/70 hover:text-white transition-colors"
-                    >
-                        Log In
-                    </Link>
+                    {isLoaded && !isSignedIn && (
+                        <SignInButton mode="modal">
+                            <button className="text-sm font-bold font-display uppercase tracking-wide text-white/70 hover:text-white transition-colors">
+                                Log In
+                            </button>
+                        </SignInButton>
+                    )}
+                    {isLoaded && isSignedIn && (
+                        <UserButton />
+                    )}
                     <Link
                         href="/apply"
                         className="group relative inline-flex items-center gap-2 px-6 py-2 rounded-full bg-white text-black font-display font-bold tracking-wide uppercase text-sm transition-transform hover:scale-105 hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
@@ -98,7 +104,6 @@ const Navbar = () => {
                             { name: "AI Chat", href: "/chat" },
                             { name: "Services", href: "/#services" }, // Updated
                             { name: "Contact", href: "/contact" },   // Updated
-                            { name: "Log In", href: "/login" },
                         ].map((link) => (
                             <Link
                                 key={link.href}
@@ -113,6 +118,18 @@ const Navbar = () => {
                                 {link.name}
                             </Link>
                         ))}
+                        {isLoaded && !isSignedIn && (
+                            <SignInButton mode="modal">
+                                <button className="px-4 py-3 rounded-xl text-sm font-medium text-left text-white/60 hover:text-white hover:bg-white/5 font-display tracking-wide uppercase">
+                                    Log In
+                                </button>
+                            </SignInButton>
+                        )}
+                        {isLoaded && isSignedIn && (
+                            <div className="px-4 py-3">
+                                <UserButton />
+                            </div>
+                        )}
                         <Link
                             href="/apply"
                             onClick={toggleMenu}

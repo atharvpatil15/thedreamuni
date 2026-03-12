@@ -102,20 +102,25 @@ export default function Home() {
         const xPos = (clientX / window.innerWidth - 0.5);
         const yPos = (clientY / window.innerHeight - 0.5);
 
-        gsap.to(capRef.current, {
-          x: xPos * -40,
-          y: yPos * -40,
-          rotation: -xPos * 15,
-          duration: 1.2,
-          ease: "power2.out"
-        });
+        if (capRef.current) {
+          gsap.to(capRef.current, {
+            x: xPos * -40,
+            y: yPos * -40,
+            rotation: -xPos * 15,
+            duration: 1.2,
+            ease: "power2.out"
+          });
+        }
 
-        gsap.to([orb1Ref.current, orb2Ref.current], {
-          x: xPos * -20,
-          y: yPos * -20,
-          duration: 2,
-          ease: "power2.out"
-        });
+        const orbs = [orb1Ref.current, orb2Ref.current].filter(Boolean);
+        if (orbs.length > 0) {
+          gsap.to(orbs, {
+            x: xPos * -20,
+            y: yPos * -20,
+            duration: 2,
+            ease: "power2.out"
+          });
+        }
       };
 
       window.addEventListener("mousemove", handleMouseMove);
@@ -149,6 +154,7 @@ export default function Home() {
         ref={heroRef}
         className="relative min-h-[90vh] flex items-center justify-center overflow-hidden perspective-1000"
       >
+        <div ref={orb1Ref} className="absolute top-[-10%] left-[-5%] w-[400px] h-[400px] bg-purple-500/10 rounded-full blur-[100px]" />
         <div ref={orb2Ref} className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[100px]" />
 
         <div ref={capContainerRef} className="absolute left-[2%] bottom-[15%] w-[120px] md:w-[220px] z-0 pointer-events-none hidden md:block">

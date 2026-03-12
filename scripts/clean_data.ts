@@ -76,14 +76,25 @@ function cleanData() {
         const name = cols[0].replace(/^"|"$/g, '');
         const location = cols[1].replace(/^"|"$/g, '');
         const ranking = cols[2]?.replace(/^"|"$/g, '') || "Not Ranked";
-        const programDetails = cols[3]?.replace(/^"|"$/g, '') || "General Admission";
-        const tuition = cols[4]?.replace(/^"|"$/g, '') || "Contact for pricing";
-        
-        // Extract hidden fields (Column 6+) found in ragged rows
-        // Based on file analysis: [5] often Requirements, [6] Cost/Term, [7] GPA, [8] IELTS
-        const requirements = cols[5]?.replace(/^"|"$/g, '') || "Standard admission requirements apply.";
-        const min_gpa = cols[6]?.replace(/^"|"$/g, '') || cols[7]?.replace(/^"|"$/g, '') || "N/A"; 
-        const ielts = cols[cols.length - 1]?.match(/\d\.\d/)?.[0] || "6.0"; // smart regex for IELTS at end
+
+        let programDetails = "General Admission";
+        let tuition = "Contact for pricing";
+        let requirements = "Standard admission requirements apply.";
+        let min_gpa = "N/A";
+        let ielts = "6.0";
+
+        if (cols.length > 5) {
+            // New Format: [3] Name, [4] Requirements, [5] Tuition, [6] GPA, [7] IELTS
+            programDetails = cols[3]?.replace(/^"|"$/g, '') || "General Admission";
+            requirements = cols[4]?.replace(/^"|"$/g, '') || "Standard admission requirements apply.";
+            tuition = cols[5]?.replace(/^"|"$/g, '') || "Contact for pricing";
+            min_gpa = cols[6]?.replace(/^"|"$/g, '') || "N/A";
+            ielts = cols[cols.length - 1]?.match(/\d\.\d/)?.[0] || "6.0";
+        } else {
+            // Old Format: [3] Name, [4] Tuition
+            programDetails = cols[3]?.replace(/^"|"$/g, '') || "General Admission";
+            tuition = cols[4]?.replace(/^"|"$/g, '') || "Contact for pricing";
+        }
 
         // Normalize Country
         let country = "International";
