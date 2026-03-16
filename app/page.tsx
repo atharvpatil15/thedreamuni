@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import DarkVeil from "@/components/DarkVeil";
 import { 
   ArrowRight, Globe, Sparkles, GraduationCap, Zap, 
   BookOpen, Banknote, Plane, Mail, Phone, MapPin, Send,
@@ -154,6 +155,9 @@ export default function Home() {
         ref={heroRef}
         className="relative min-h-[90vh] flex items-center justify-center overflow-hidden perspective-1000"
       >
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-100">
+           <DarkVeil speed={0.3} noiseIntensity={0.03} />
+        </div>
         <div ref={orb1Ref} className="absolute top-[-10%] left-[-5%] w-[400px] h-[400px] bg-purple-500/10 rounded-full blur-[100px]" />
         <div ref={orb2Ref} className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[100px]" />
 
